@@ -27,17 +27,28 @@ jobs:
           shopt -s globstar
           rustfmt --check ./src/**/*.rs
 
-  build:
+  test:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
-      - name: Build
-        run: cargo build --verbose
       - name: Run tests
         run: cargo test --verbose
-      - name: Publish
+
+  publish:
+    needs: [precheck, test]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # all desktop platforms we are targetting for our tool
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build ${{ matrix.os }}
+        run: cargo build --verbose
+      - name: Publish ${{ matrix.os }}
         uses: actions/upload-artifact@v2
         with:
-          name: sire_linux
+          name: ${{ matrix.os }}
           path: target/debug/sire
