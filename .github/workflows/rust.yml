@@ -2,26 +2,42 @@ name: Rust
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  precheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run Linter
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features
+      - name: Check code style
+        # NOTE: we have to set the BASH shell option 'globstar'
+        #       for the **/*.rs syntax to work. Apparently this
+        #       feature is disabled by default for some reason
+        run: |
+          shopt -s globstar
+          rustfmt --check ./src/**/*.rs
 
+  build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
-    - name: Publish
-      uses: actions/upload-artifact@v2
-      with:
-        name: sire_linux
-        path: target/debug/sire
+      - uses: actions/checkout@v2
+      - name: Build
+        run: cargo build --verbose
+      - name: Run tests
+        run: cargo test --verbose
+      - name: Publish
+        uses: actions/upload-artifact@v2
+        with:
+          name: sire_linux
+          path: target/debug/sire
