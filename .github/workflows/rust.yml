@@ -37,18 +37,28 @@ jobs:
 
   publish:
     needs: [precheck, test]
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.job.os }}
     strategy:
       matrix:
-        # all desktop platforms we are targetting for our tool
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        job:
+          # build binaries for every supported platform
+          - os: ubuntu-latest
+            binary-name: "sire"
+            asset-name: "sire" # asset names must be unique within a given release
+          - os: macos-latest
+            binary-name: "sire"
+            asset-name: "sire_mac" # asset names must be unique within a given release
+          - os: windows-latest
+            binary-name: "sire.exe"
+            asset-name: "sire.exe" # asset names must be unique within a given release
 
     steps:
       - uses: actions/checkout@v2
-      - name: Build ${{ matrix.os }}
+      - name: Build ${{ matrix.job.os }}
         run: cargo build --verbose
-      - name: Publish ${{ matrix.os }}
+      - name: Publish ${{ matrix.job.os }}
+        # plugin docs: https://github.com/actions/upload-artifact
         uses: actions/upload-artifact@v2
         with:
-          name: ${{ matrix.os }}
-          path: target/debug/sire
+          name: ${{ matrix.job.asset-name }}
+          path: target/debug/${{ matrix.job.binary-name }}
