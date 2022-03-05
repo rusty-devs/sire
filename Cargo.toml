@@ -1,7 +1,23 @@
 [package]
+version = "0.0.2-alpha"
 name = "sire"
-version = "0.1.0"
+description = "command line tool for generating source code projects from user defined templates"
+authors = ["Adam Baker", "Kevin Phillips <thefriendlycoder@gmail.com>", "Mike McLennan", "Prem Raheja", "Zack Troop"]
+
+# supports up to 5 values
+keywords = ["template", "project", "generator", "code"]
+# Slug reference list: https://crates.io/category_slugs
+# supports up to 5 values
+categories = ["command-line-utilities", "config", "development-tools::build-utils", "template-engine"]
+readme = "./README.md"
+homepage = "https://github.com/rusty-devs/sire"
+repository = "https://github.com/rusty-devs/sire"
+# Supported license identifiers: https://spdx.org/licenses/
+license = "Apache-2.0"
 edition = "2021"
+
+# Exclude CI scripts, unit tests and intermediate build folders from our crate
+exclude = [".github/", "target/", "coverage", "roadmap.md", ".gitignore", "tests/", "lcov.info"]
 
 [dependencies]
 
