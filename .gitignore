@@ -1,3 +1,7 @@
 /target
 .vscode
 .idea
+
+# grcov output
+default.profraw
+coverage/*

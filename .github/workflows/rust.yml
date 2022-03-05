@@ -1,10 +1,6 @@
 name: Rust
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+on: [push, pull_request]
 
 env:
   CARGO_TERM_COLOR: always
@@ -32,8 +28,27 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+      # we need the nightly builds of Rust to enable the instrumentation
+      # necessary for the code coverage metrics
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
       - name: Run tests
         run: cargo test --verbose
+        env:
+          # enable Rust features for instrumenting code executed by the test operation
+          CARGO_INCREMENTAL: "0"
+          RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests"
+          RUSTDOCFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests"
+      - id: coverage
+        uses: actions-rs/grcov@v0.1
+        # Configuration parameters for grcov are found in the ./.github/actions-rs/grcov.yml file
+      - name: Coveralls upload
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./lcov.info
 
   publish:
     needs: [precheck, test]
