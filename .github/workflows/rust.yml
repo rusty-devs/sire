@@ -22,6 +22,13 @@ jobs:
         run: |
           shopt -s globstar
           rustfmt --check ./src/**/*.rs
+      - name: Validate package
+        # This is equivalent to "cargo publish --dry-run"
+        # Ensures the package metadata is configured properly
+        run: cargo package --verbose
+      # show the contents of the generated crate, for reference purposes
+      - name: Show package contents
+        run: cargo package --list
 
   test:
     runs-on: ubuntu-latest

@@ -7,7 +7,22 @@ on:
 name: Publish
 
 jobs:
-  publish:
+  publish-crates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: publish
+        run: cargo publish --verbose
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  publish-binaries:
     runs-on: ${{ matrix.job.os }}
     strategy:
       matrix:
