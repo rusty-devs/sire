@@ -42,12 +42,8 @@ jobs:
           toolchain: nightly
           override: true
       - name: Run tests
-        run: cargo test --verbose
-        env:
-          # enable Rust features for instrumenting code executed by the test operation
-          CARGO_INCREMENTAL: "0"
-          RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests"
-          RUSTDOCFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests"
+        run: ./run_tests.sh
+      # Reference: https://github.com/actions-rs/grcov
       - id: coverage
         uses: actions-rs/grcov@v0.1
         # Configuration parameters for grcov are found in the ./.github/actions-rs/grcov.yml file

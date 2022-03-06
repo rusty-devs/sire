@@ -3,5 +3,7 @@
 .idea
 
 # grcov output
-default.profraw
+*.profraw
 coverage/*
+lcov.info
+ccov.zip
