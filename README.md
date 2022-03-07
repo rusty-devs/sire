@@ -1,5 +1,7 @@
 # Sire
 
+[![Coverage Status](https://coveralls.io/repos/github/rusty-devs/sire/badge.svg?branch=main)](https://coveralls.io/github/rusty-devs/sire?branch=main) ![sire](https://github.com/rusty-devs/sire/actions/workflows/rust.yml/badge.svg)
+
 Welcome!
 
 **sire** is a command line tool that simplifies creating and maintaining new source code projects by leveraging patterns from user defined "templates". The primary purpose for the tool is to save developers and teams time when creating new source code projects by re-using consistent patterns (ie: folder structures, build tools, libraries and frameworks), and making it easy to keep those projects up to date when changes are made to the templates. The tool is intended to to be language-agnostic allowing projects written in  programming language or toolchain to be managed in a similar way.
