@@ -1,5 +1,5 @@
 [package]
-version = "0.0.2-alpha"
+version = "0.0.3-alpha"
 name = "sire"
 description = "command line tool for generating source code projects from user defined templates"
 authors = ["Adam Baker", "Kevin Phillips <thefriendlycoder@gmail.com>", "Mike McLennan", "Prem Raheja", "Zack Troop"]
@@ -20,6 +20,11 @@ edition = "2021"
 exclude = [".github/", "target/", "coverage", "roadmap.md", ".gitignore", "tests/", "lcov.info"]
 
 [dependencies]
+tera = "1.15.0"
+clap = { version = "3.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.8"
+walkdir = "2.3.2"
 
 [dev-dependencies]
 assert_cmd = "2"

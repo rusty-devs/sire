@@ -1,5 +1,9 @@
-mod lib;
+use clap::StructOpt;
+use sire::{App, Config};
 
 fn main() {
-    lib::hello_world()
+    let conf = Config::parse();
+    let app = App::from(conf);
+
+    app.run();
 }
