@@ -1,4 +1,5 @@
 use clap::Parser;
+use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use std::fmt::Result;
 use std::io;
@@ -22,12 +23,20 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load_target_config(&self) -> TargetConfig {
+    pub fn load_target_config(&self) -> Option<TargetConfig> {
         let mut config_file = PathBuf::from(&self.source_dir);
         config_file.push("config.yml");
+
         let file = File::open(&config_file).unwrap();
         let reader = BufReader::new(&file);
-        serde_yaml::from_reader(reader).unwrap()
+        match serde_yaml::from_reader(reader) {
+            Ok(conf) => {
+                info!("Loaded target configuration: {}", config_file.display());
+                return Some(conf);
+            }
+            Err(_) => error!("Cannot load: {}", config_file.display()),
+        }
+        None
     }
 }
 
@@ -46,7 +55,7 @@ pub struct App {
     config: TargetConfig,
 }
 
-pub fn slug_file_name(path: &PathBuf) -> Option<bool> {
+pub fn slug_file_name(path: &Path) -> Option<bool> {
     Some(
         path.file_name()?
             .to_str()?
@@ -68,33 +77,35 @@ where
 impl App {
     pub fn run(&self) -> Result {
         for item in walk_source_dir(&self.src_dir) {
+            debug!("Processing: {}", &item.display());
+
             if item.is_dir() {
-                self.copy_dir_to_dest(&item);
+                self.copy_dir_to_dest(&item).ok();
             } else if item.is_file() {
-                self.copy_file_to_dest(&item);
+                self.copy_file_to_dest(&item).ok();
             }
         }
 
         Ok(())
     }
 
-    fn copy_dir_to_dest(&self, dir: &PathBuf) -> io::Result<()> {
+    fn copy_dir_to_dest(&self, dir: &Path) -> Result {
         let mut dest = PathBuf::new();
+        dest.push(&self.dest_dir);
 
-        if let Some(_) = slug_file_name(dir) {
-            if let Some(parent) = dir.parent() {
-                dest.push(&self.dest_dir);
-                dest.push(&self.config.project_name);
-            }
-        } else {
-            if let Some(name) = dir.file_name() {
-                dest.push(&self.dest_dir);
-                dest.push(name);
-            }
+        if slug_file_name(dir).unwrap() {
+            dest.push(&self.config.project_name);
+        } else if dir == self.src_dir.as_path() {
+            return Ok(());
+        } else if let Some(name) = dir.file_name() {
+            dest.push(name);
         }
 
-        println!("{:?}", dest);
-        fs::create_dir(dest)?;
+        match fs::create_dir(&dest) {
+            Ok(_) => info!("Created directory: {}", &dest.display()),
+            Err(e) => error!("Cannot create directory: {} {}", &dest.display(), e),
+        }
+
         Ok(())
     }
 
@@ -103,7 +114,7 @@ impl App {
 
         if let Some(name) = file.file_name() {
             if name == "config.yml" {
-                return Ok(())
+                return Ok(());
             }
             dest.push(&self.dest_dir);
             dest.push(name);
@@ -117,7 +128,12 @@ impl App {
         )
         .unwrap();
 
-        fs::write(dest, result).expect("Unable to write file");
+        match fs::write(&dest, result) {
+            Ok(_) => info!("Created file: {}", &dest.display()),
+            Err(e) => {
+                error!("Cannot create file: {} {}", &dest.display(), e)
+            }
+        }
 
         Ok(())
     }
@@ -125,7 +141,7 @@ impl App {
 
 impl From<Config> for App {
     fn from(conf: Config) -> Self {
-        let target_config = conf.load_target_config();
+        let target_config = conf.load_target_config().unwrap();
         Self {
             src_dir: conf.source_dir,
             dest_dir: conf.destination_dir,
