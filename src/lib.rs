@@ -1,7 +1,7 @@
 use clap::Parser;
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
-use std::error;
+use std::error::{self};
 use std::fmt::Result;
 use std::{
     fs,
@@ -30,20 +30,29 @@ impl Config {
     ///
     /// Requires a `config.yml` in the source directory that satisfies
     /// each field in the `TargetConfig` struct
-    pub fn load_target_config(&self) -> Option<TargetConfig> {
+    pub fn load_target_config(&self) -> BoxedResult<TargetConfig> {
         let mut config_file = PathBuf::from(&self.source_dir);
         config_file.push("config.yml");
 
-        let file = File::open(&config_file).unwrap();
-        let reader = BufReader::new(&file);
-        match serde_yaml::from_reader(reader) {
-            Ok(conf) => {
-                info!("Loaded target configuration: {}", config_file.display());
-                return Some(conf);
+        match File::open(&config_file) {
+            Ok(file) => {
+                let reader = BufReader::new(&file);
+                match serde_yaml::from_reader(reader) {
+                    Ok(conf) => {
+                        info!("Loaded target configuration: {}", config_file.display());
+                        Ok(conf)
+                    }
+                    Err(e) => {
+                        error!("Cannot deserialize: {}", config_file.display());
+                        Err(Box::new(e))
+                    }
+                }
             }
-            Err(_) => error!("Cannot load: {}", config_file.display()),
+            Err(e) => {
+                error!("No configuration found: {}", config_file.display());
+                Err(Box::new(e))
+            }
         }
-        None
     }
 }
 
@@ -187,8 +196,10 @@ impl App {
 
 impl From<Config> for App {
     /// Create instance of `App` from `Config`
-    fn from(conf: Config) -> Self {
-        let target_config = conf.load_target_config().unwrap();
+    fn from(conf: Config) -> App {
+        let target_config = conf
+            .load_target_config()
+            .expect("Configuration failed to load.");
         Self {
             src_dir: conf.source_dir,
             dest_dir: conf.destination_dir,
