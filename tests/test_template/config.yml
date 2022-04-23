@@ -1,0 +1,14 @@
+project_name: "test-project"
+project_description: "A description."
+repository: "https://github.com/rusty-devs/sire"
+homepage: "http://example.com"
+full_name: "Jane Doe"
+license: "MIT"
+version: "0.1.0"
+email: "foo.bar@example.com"
+extras:
+  organization: "Fizz Buzz"
+  build_mode:
+    - foo
+    - bar
+  debug: true

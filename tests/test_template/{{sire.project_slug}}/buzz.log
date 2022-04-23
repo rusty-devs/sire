@@ -1,0 +1,7 @@
+Hello World!
+
+{{ extras.organization }}
+
+{% for item in extras.build_mode %}
+{{ item }}
+{% endfor %}

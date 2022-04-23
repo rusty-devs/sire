@@ -1,6 +1,8 @@
 use clap::Parser;
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
+use std::collections::HashMap;
 use std::error::{self};
 use std::fmt::Result;
 use std::{
@@ -10,6 +12,9 @@ use std::{
 use std::{fs::File, io::BufReader};
 use tera::{Context, Tera};
 use walkdir::WalkDir;
+
+/// Boxed `std::result::Result` type
+type BoxedResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
 /// Struct for argument parsing and used by `clap`
 #[derive(Parser, Debug)]
@@ -21,6 +26,28 @@ pub struct Config {
     /// Directory target to apply changes
     #[clap(short, long)]
     pub destination_dir: PathBuf,
+}
+
+/// Struct for template variable serialization
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct TargetConfig {
+    pub project_name: String,
+    pub project_description: String,
+    pub repository: String,
+    pub homepage: String,
+    pub full_name: String,
+    pub license: String,
+    pub version: String,
+    pub email: String,
+    #[serde(flatten)]
+    pub extras: HashMap<String, Value>,
+}
+
+/// Struct for handling core functionality
+pub struct App {
+    source_dir: PathBuf,
+    destination_dir: PathBuf,
+    config: TargetConfig,
 }
 
 impl Config {
@@ -56,37 +83,6 @@ impl Config {
     }
 }
 
-/// Struct for template variable serialization
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct TargetConfig {
-    project_name: String,
-    project_description: String,
-    license: String,
-    version: String,
-    email: String,
-}
-
-/// Struct for handling core functionality
-pub struct App {
-    src_dir: PathBuf,
-    dest_dir: PathBuf,
-    config: TargetConfig,
-}
-
-/// If parsing is successful, returns a boolean if `{{sire.project_slug}}`
-/// is found in source directory
-///
-/// # Arguments
-///
-/// * `path` - A slice of a path to inspect for slug usage
-pub fn slug_file_name(path: &Path) -> Option<bool> {
-    Some(
-        path.file_name()?
-            .to_str()?
-            .contains("{{sire.project_slug}}"),
-    )
-}
-
 /// Generic function that recursively searches valid files and directories
 /// in a given path and returns a collection of mutable paths
 ///
@@ -104,17 +100,14 @@ where
         .collect()
 }
 
-/// Boxed `std::result::Result` type
-type BoxedResult<T> = std::result::Result<T, Box<dyn error::Error>>;
-
 /// Creates the given directory if its missing
 ///
 /// # Argments
 ///
-/// * dir - Slice of a path to check and create if missing
-pub fn create_dir_if_missing(dir: &Path) -> BoxedResult<()> {
-    if !dir.exists() {
-        fs::create_dir(dir)?;
+/// * dir_path - Slice of a path to check and create if missing
+pub fn create_directory(dir_path: &PathBuf) -> BoxedResult<()> {
+    if !dir_path.exists() {
+        fs::create_dir(dir_path)?;
     }
     Ok(())
 }
@@ -122,19 +115,38 @@ pub fn create_dir_if_missing(dir: &Path) -> BoxedResult<()> {
 impl App {
     /// The control logic for `sire` functionality
     pub fn run(&self) -> Result {
-        create_dir_if_missing(&self.dest_dir).unwrap();
+        create_directory(&self.destination_dir).unwrap();
 
-        for item in walk_source_dir(&self.src_dir) {
+        for item in walk_source_dir(&self.source_dir) {
             debug!("Processing: {}", &item.display());
 
             if item.is_dir() {
-                self.copy_dir_to_dest(&item).ok();
+                self.directory_to_destination(&item).unwrap();
             } else if item.is_file() {
-                self.copy_file_to_dest(&item).ok();
+                self.file_to_destination(&item).unwrap();
             }
         }
 
         Ok(())
+    }
+
+    /// Construct a new destination directory path and substitute
+    /// any `{{sire.project_slug}}` usage in file path
+    ///
+    /// # Arguments
+    ///
+    /// * dir_path - Slice of a path
+    fn preprocess(&self, dir_path: &Path) -> PathBuf {
+        let dest = PathBuf::from_iter([
+            &self.destination_dir,
+            dir_path.strip_prefix(&self.source_dir).unwrap(),
+        ]);
+        PathBuf::from(
+            dest.as_os_str()
+                .to_str()
+                .unwrap()
+                .replace("{{sire.project_slug}}", &self.config.project_name),
+        )
     }
 
     /// Copy over source directories to specified destination
@@ -142,23 +154,17 @@ impl App {
     ///
     /// # Arguments
     ///
-    /// * dir - Slice of a path to create in destination
-    fn copy_dir_to_dest(&self, dir: &Path) -> Result {
-        let mut dest = PathBuf::new();
-        dest.push(&self.dest_dir);
-
-        if slug_file_name(dir).unwrap() {
-            dest.push(&self.config.project_name);
-        } else if dir == self.src_dir.as_path() {
-            // First element in iteration is the `src_dir` itself
+    /// * dir_path - Slice of a path
+    fn directory_to_destination(&self, dir_path: &PathBuf) -> Result {
+        let path = self.preprocess(dir_path);
+        if dir_path == self.source_dir.as_path() {
+            // First element in the iteration is the `src_dir` itself
             return Ok(());
-        } else if let Some(name) = dir.file_name() {
-            dest.push(name);
         }
 
-        match create_dir_if_missing(&dest) {
-            Ok(_) => info!("Created directory: {}", &dest.display()),
-            Err(e) => error!("Cannot create directory: {} {}", &dest.display(), e),
+        match create_directory(&path) {
+            Ok(_) => info!("Created directory: {}", &path.display()),
+            Err(e) => error!("Cannot create directory: {} {}", &path.display(), e),
         }
 
         Ok(())
@@ -168,25 +174,22 @@ impl App {
     ///
     /// # Arguments
     ///
-    /// * file - Slice of a path to create in destination
-    fn copy_file_to_dest(&self, file: &Path) -> BoxedResult<()> {
-        let mut dest = PathBuf::new();
-
-        if let Some(name) = file.file_name() {
+    /// * file_path - Slice of a path
+    fn file_to_destination(&self, file_path: &PathBuf) -> BoxedResult<()> {
+        let path = self.preprocess(file_path);
+        if let Some(name) = path.file_name() {
             if name == "config.yml" {
                 return Ok(());
             }
-            dest.push(&self.dest_dir);
-            dest.push(name);
         }
 
-        let template: String = fs::read_to_string(&file)?.parse()?;
+        let template: String = fs::read_to_string(&file_path)?.parse()?;
         let result = Tera::one_off(&template, &Context::from_serialize(&self.config)?, true)?;
 
-        match fs::write(&dest, result) {
-            Ok(_) => info!("Created file: {}", &dest.display()),
+        match fs::write(&path, result) {
+            Ok(_) => info!("Created file: {}", &path.display()),
             Err(e) => {
-                error!("Cannot create file: {} {}", &dest.display(), e)
+                error!("Cannot create file: {} {}", &path.display(), e)
             }
         }
 
@@ -201,8 +204,8 @@ impl From<Config> for App {
             .load_target_config()
             .expect("Configuration failed to load.");
         Self {
-            src_dir: conf.source_dir,
-            dest_dir: conf.destination_dir,
+            source_dir: conf.source_dir,
+            destination_dir: conf.destination_dir,
             config: target_config,
         }
     }

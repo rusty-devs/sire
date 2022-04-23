@@ -6,7 +6,7 @@ use assert_cmd::Command;
 fn success() {
     let mut path = env::current_dir().unwrap();
     path.push("tests");
-    path.push("test_project");
+    path.push("test_template");
 
     let mut cmd = Command::cargo_bin("sire").unwrap();
     cmd.args(&["-s", path.as_os_str().to_str().unwrap(), "-d", "/tmp/test"]);
