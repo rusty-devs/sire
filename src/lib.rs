@@ -1,17 +1,15 @@
+use crate::manifest::{ManifestData, MANIFEST_FILE_NAME};
 use clap::Parser;
 use log::{debug, error, info};
-use serde::{Deserialize, Serialize};
-use serde_yaml::Value;
-use std::collections::HashMap;
-use std::error::{self};
+use std::error;
 use std::fmt::Result;
 use std::{
     fs,
     path::{Path, PathBuf},
 };
-use std::{fs::File, io::BufReader};
 use tera::{Context, Tera};
 use walkdir::WalkDir;
+mod manifest;
 
 /// Boxed `std::result::Result` type
 type BoxedResult<T> = std::result::Result<T, Box<dyn error::Error>>;
@@ -28,26 +26,11 @@ pub struct Config {
     pub destination_dir: PathBuf,
 }
 
-/// Struct for template variable serialization
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct TargetConfig {
-    pub project_name: String,
-    pub project_description: String,
-    pub repository: String,
-    pub homepage: String,
-    pub full_name: String,
-    pub license: String,
-    pub version: String,
-    pub email: String,
-    #[serde(flatten)]
-    pub extras: HashMap<String, Value>,
-}
-
 /// Struct for handling core functionality
 pub struct App {
     source_dir: PathBuf,
     destination_dir: PathBuf,
-    config: TargetConfig,
+    manifest: ManifestData,
 }
 
 impl Config {
@@ -55,31 +38,13 @@ impl Config {
     ///
     /// # Configuration
     ///
-    /// Requires a `config.yml` in the source directory that satisfies
-    /// each field in the `TargetConfig` struct
-    pub fn load_target_config(&self) -> BoxedResult<TargetConfig> {
+    /// Requires a `sire.manifest.yml` in the source directory that satisfies
+    /// each field in the `ManifestData` struct
+    pub fn load_manifest_file(&self) -> BoxedResult<ManifestData> {
         let mut config_file = PathBuf::from(&self.source_dir);
-        config_file.push("config.yml");
+        config_file.push(MANIFEST_FILE_NAME);
 
-        match File::open(&config_file) {
-            Ok(file) => {
-                let reader = BufReader::new(&file);
-                match serde_yaml::from_reader(reader) {
-                    Ok(conf) => {
-                        info!("Loaded target configuration: {}", config_file.display());
-                        Ok(conf)
-                    }
-                    Err(e) => {
-                        error!("Cannot deserialize: {}", config_file.display());
-                        Err(Box::new(e))
-                    }
-                }
-            }
-            Err(e) => {
-                error!("No configuration found: {}", config_file.display());
-                Err(Box::new(e))
-            }
-        }
+        manifest::load_manifest_file(&config_file)
     }
 }
 
@@ -145,7 +110,7 @@ impl App {
             dest.as_os_str()
                 .to_str()
                 .unwrap()
-                .replace("{{sire.project_slug}}", &self.config.project_name),
+                .replace("{{sire.project_slug}}", &self.manifest.project_name),
         )
     }
 
@@ -178,13 +143,13 @@ impl App {
     fn file_to_destination(&self, file_path: &PathBuf) -> BoxedResult<()> {
         let path = self.preprocess(file_path);
         if let Some(name) = path.file_name() {
-            if name == "config.yml" {
+            if name == MANIFEST_FILE_NAME {
                 return Ok(());
             }
         }
 
         let template: String = fs::read_to_string(&file_path)?.parse()?;
-        let result = Tera::one_off(&template, &Context::from_serialize(&self.config)?, true)?;
+        let result = Tera::one_off(&template, &Context::from_serialize(&self.manifest)?, true)?;
 
         match fs::write(&path, result) {
             Ok(_) => info!("Created file: {}", &path.display()),
@@ -200,13 +165,13 @@ impl App {
 impl From<Config> for App {
     /// Create instance of `App` from `Config`
     fn from(conf: Config) -> App {
-        let target_config = conf
-            .load_target_config()
-            .expect("Configuration failed to load.");
+        let manifest = conf
+            .load_manifest_file()
+            .expect("Manifest file failed to load.");
         Self {
             source_dir: conf.source_dir,
             destination_dir: conf.destination_dir,
-            config: target_config,
+            manifest,
         }
     }
 }

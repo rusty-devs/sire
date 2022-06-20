@@ -1,0 +1,10 @@
+# This manifest file contains only the required parameters needed
+# for the parser to complete successfully, with no optional properties
+project_name: "test-project"
+project_description: "A description."
+repository: "https://github.com/namespace/repo"
+homepage: "http://example.com"
+full_name: "Jane Doe"
+license: "MIT"
+version: "0.1.0"
+email: "foo.bar@example.com"

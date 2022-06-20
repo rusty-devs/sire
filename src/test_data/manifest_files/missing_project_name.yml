@@ -1,0 +1,16 @@
+# This sample config file is missing the "project_name" property which
+# is required by the manifest file specification and thus should fail
+# to parse
+project_description: "A description."
+repository: "https://github.com/namespace/repo"
+homepage: "http://example.com"
+full_name: "Jane Doe"
+license: "MIT"
+version: "0.1.0"
+email: "foo.bar@example.com"
+extras:
+  organization: "Fizz Buzz"
+  build_mode:
+    - foo
+    - bar
+  debug: true
